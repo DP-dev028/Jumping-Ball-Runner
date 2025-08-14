@@ -8,7 +8,7 @@ A tiny, colorful, one-file runner game. Boing over goofy obstacles, enjoy parall
 - Retry and Mute buttons, plus keyboard and touch controls
 - Parallax backgrounds (clouds + rolling hills)
 - Cartoonish ball and animated obstacles (boxes and spikes)
-- No assets, no build — single HTML file, offline-friendly
+- **No assets needed**, no build — single HTML file, offline-friendly
 - Fun procedural sounds for jump, crash, milestones, and start
 
 ## Controls
