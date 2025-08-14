@@ -1,0 +1,963 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Jumping Ball Runner</title>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no" />
+<style>
+  :root{
+    --bg1:#7cc0ff;
+    --bg2:#ffda79;
+    --accent:#ff4fd8;
+    --accent2:#4dffb8;
+    --dark:#222;
+    --light:#fff;
+    --ui:#1b1b1bcc;
+    --btn:#ff7a59;
+    --btn2:#6a5cff;
+    --green:#45e07d;
+    --red:#ff4d6d;
+    --shadow: 0 10px 30px rgba(0,0,0,.25);
+    --rounded: 16px;
+  }
+  html,body{
+    margin:0; height:100%; overflow:hidden; background: linear-gradient(180deg,var(--bg1) 0%, var(--bg2) 100%);
+    font-family: system-ui, -apple-system, Segoe UI, Roboto, Ubuntu, Cantarell, Noto Sans, Arial, "Apple Color Emoji","Segoe UI Emoji";
+    color: var(--light);
+  }
+  #game{
+    display:block; position:fixed; inset:0; width:100vw; height:100vh;
+    touch-action: manipulation; background: transparent;
+  }
+  .hud{
+    position:fixed; inset:0; pointer-events:none;
+  }
+  .bar{
+    position:absolute; left:0; right:0; top:0; display:flex; align-items:center; justify-content:space-between;
+    padding:10px 14px; gap:8px;
+    mix-blend-mode: normal;
+  }
+  .chip{
+    pointer-events:auto;
+    background: var(--ui); color: #fff; padding:8px 12px; border-radius: 999px; font-weight:700;
+    display:inline-flex; align-items:center; gap:8px; box-shadow: var(--shadow); border: 2px solid #ffffff22;
+    backdrop-filter: blur(6px);
+    user-select:none;
+  }
+  .chip .label{ opacity:.9; letter-spacing:.4px; font-size:14px }
+  .chip .value{ font-size:18px }
+  .chip.icon{ width:42px; height:42px; justify-content:center; padding:0 }
+  .chip.btn{ cursor:pointer; transition: transform .06s ease; }
+  .chip.btn:active{ transform: translateY(1px) scale(.98) }
+  .title{
+    position:absolute; left:50%; transform:translateX(-50%); top:10px; padding:10px 16px; border-radius:999px; font-weight:900;
+    background: linear-gradient(90deg, #ff7ab6, #ffd36b, #7bffcf); color:#111; border:3px solid #ffffffaa; box-shadow: var(--shadow);
+    letter-spacing:.8px; text-shadow: 0 1px #fff8;
+  }
+  .overlay{
+    position:fixed; inset:0; display:flex; align-items:center; justify-content:center; pointer-events:auto;
+    background: linear-gradient(180deg, #00000055, #00000077);
+  }
+  .card{
+    width:min(680px, calc(100vw - 36px));
+    background:#ffffffee; color:#222; border-radius:20px; box-shadow: var(--shadow);
+    padding:22px 20px; text-align:center; border:4px solid #fff;
+    backdrop-filter: blur(6px);
+  }
+  .card h1{
+    margin:0 0 10px; font-size: clamp(24px, 4.8vw, 36px);
+    background: linear-gradient(90deg,#6a5cff,#ff7a59,#28d7a2);
+    color: transparent; -webkit-background-clip:text; background-clip:text;
+    font-weight:1000; letter-spacing: .8px;
+  }
+  .card p{ margin:10px 0; color:#333 }
+  .cta{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center; justify-content:center; margin-top:14px;
+  }
+  .btn{
+    appearance:none; border:0; cursor:pointer; padding:12px 18px; border-radius:999px; font-weight:900; letter-spacing:.5px;
+    background: var(--btn); color:#fff; box-shadow: var(--shadow); border:3px solid #fff;
+    transition: transform .06s ease, filter .2s ease;
+  }
+  .btn.alt{ background: var(--btn2) }
+  .btn.green{ background: var(--green); color:#072 }
+  .btn:hover{ filter: brightness(1.05) }
+  .btn:active{ transform: translateY(1px) scale(.98) }
+
+  .hidden{ display:none }
+
+  .tips{
+    display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap:10px; margin-top:10px; text-align:left
+  }
+  .tip{
+    background:#f6f7ff; color:#222; padding:10px 12px; border-radius:12px; border:2px dashed #e4e7ff;
+  }
+  .tip b{ color:#6a5cff }
+  .new-high{ color:#ff2f9c; font-weight:900 }
+  .footer-note{ font-size:12px; color:#555; margin-top:8px }
+</style>
+</head>
+<body>
+
+<canvas id="game" aria-label="Jumping Ball Runner game canvas"></canvas>
+
+<div class="hud" aria-hidden="false">
+  <div class="bar">
+    <div class="chip">
+      <span class="label">High</span>
+      <span id="hi" class="value">0</span>
+    </div>
+    <div class="title">🎈 Jumping Ball Runner</div>
+    <div style="display:flex; gap:8px; align-items:center">
+      <div class="chip">
+        <span class="label">Speed</span>
+        <span id="spd" class="value">1.0x</span>
+      </div>
+      <div class="chip">
+        <span class="label">Score</span>
+        <span id="sc" class="value">0</span>
+      </div>
+      <button id="muteBtn" class="chip btn icon" aria-label="Toggle sound" title="Toggle sound (M)">
+        🔊
+      </button>
+    </div>
+  </div>
+</div>
+
+<div id="overlay" class="overlay">
+  <div class="card" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h1 id="dlgTitle">🎉 Welcome to Jumping Ball Runner</h1>
+    <p>Jump over obstacles and survive as long as possible. The longer you last, the faster it gets!</p>
+    <div class="tips">
+      <div class="tip"><b>Jump:</b> Space / Up Arrow / Tap</div>
+      <div class="tip"><b>Retry:</b> R or button after crash</div>
+      <div class="tip"><b>Mute:</b> M or speaker button</div>
+    </div>
+    <div class="cta">
+      <button id="playBtn" class="btn">Let’s Go! 🚀</button>
+      <button id="howBtn" class="btn alt">How to play</button>
+    </div>
+    <p class="footer-note">Tip: Try to time your jumps late — the ball’s boing is strong!</p>
+  </div>
+</div>
+
+<script>
+(() => {
+  const canvas = document.getElementById('game');
+  const ctx = canvas.getContext('2d', { alpha:true, desynchronized:true });
+  let W = 0, H = 0, DPR = Math.min(2, window.devicePixelRatio || 1);
+
+  function resize() {
+    W = window.innerWidth;
+    H = window.innerHeight;
+    DPR = Math.min(2, window.devicePixelRatio || 1);
+    canvas.width = W * DPR;
+    canvas.height = H * DPR;
+    canvas.style.width = W + 'px';
+    canvas.style.height = H + 'px';
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+  }
+  window.addEventListener('resize', resize, { passive:true });
+  resize();
+
+  // UI elements
+  const elScore = document.getElementById('sc');
+  const elHigh  = document.getElementById('hi');
+  const elSpd   = document.getElementById('spd');
+  const overlay = document.getElementById('overlay');
+  const playBtn = document.getElementById('playBtn');
+  const howBtn  = document.getElementById('howBtn');
+  const muteBtn = document.getElementById('muteBtn');
+
+  // Storage
+  const HS_KEY = 'jbr_highscore_v1';
+  let highScore = parseInt(localStorage.getItem(HS_KEY) || '0', 10);
+  elHigh.textContent = highScore.toString();
+
+  // Sound engine (procedural, funny, lightweight)
+  let audioCtx = null, masterGain = null, isMuted = false, primed = false;
+  function primeAudio() {
+    if (primed) return;
+    primed = true;
+    try {
+      audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      masterGain = audioCtx.createGain();
+      masterGain.gain.value = isMuted ? 0 : 0.7;
+      masterGain.connect(audioCtx.destination);
+    } catch (e) {
+      // Audio unavailable
+    }
+  }
+  function setMuted(v) {
+    isMuted = v;
+    muteBtn.textContent = isMuted ? '🔇' : '🔊';
+    if (masterGain) masterGain.gain.value = isMuted ? 0 : 0.7;
+  }
+  function now() { return audioCtx ? audioCtx.currentTime : 0; }
+  function mkGain(val=1) {
+    const g = audioCtx.createGain();
+    g.gain.value = val;
+    g.connect(masterGain);
+    return g;
+  }
+  function mkFilter(type='lowpass', freq=1200, Q=0.8) {
+    const f = audioCtx.createBiquadFilter();
+    f.type = type; f.frequency.value = freq; f.Q.value = Q;
+    f.connect(masterGain);
+    return f;
+  }
+  function noiseBuffer(sec=0.5) {
+    const sr = audioCtx.sampleRate;
+    const length = Math.floor(sr * sec);
+    const buf = audioCtx.createBuffer(1, length, sr);
+    const data = buf.getChannelData(0);
+    for (let i=0;i<length;i++) data[i] = Math.random()*2-1;
+    return buf;
+  }
+  function playJump() {
+    if (!audioCtx || isMuted) return;
+    const t = now();
+    const bus = mkGain(0.8);
+    // main boing chirp
+    const o1 = audioCtx.createOscillator();
+    const g1 = audioCtx.createGain();
+    o1.type = 'sine';
+    o1.frequency.setValueAtTime(220, t);
+    o1.frequency.exponentialRampToValueAtTime(520, t+0.05);
+    o1.frequency.exponentialRampToValueAtTime(180, t+0.25);
+    g1.gain.setValueAtTime(0.0001, t);
+    g1.gain.exponentialRampToValueAtTime(0.9, t+0.02);
+    g1.gain.exponentialRampToValueAtTime(0.0001, t+0.30);
+    o1.connect(g1); g1.connect(bus);
+
+    // squishy filter sweep
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(300, t);
+    filter.frequency.exponentialRampToValueAtTime(2000, t+0.12);
+    filter.frequency.exponentialRampToValueAtTime(800, t+0.30);
+    bus.connect(filter); filter.connect(masterGain);
+
+    o1.start(t); o1.stop(t+0.35);
+  }
+  function playHit() {
+    if (!audioCtx || isMuted) return;
+    const t = now();
+    const g = mkGain(0.8);
+    const n = audioCtx.createBufferSource();
+    n.buffer = noiseBuffer(0.4);
+    const f = audioCtx.createBiquadFilter();
+    f.type = 'bandpass';
+    f.frequency.setValueAtTime(300, t);
+    f.frequency.linearRampToValueAtTime(140, t+0.25);
+    const eg = audioCtx.createGain();
+    eg.gain.setValueAtTime(0.9, t);
+    eg.gain.exponentialRampToValueAtTime(0.0001, t+0.35);
+    n.connect(f); f.connect(eg); eg.connect(g); g.connect(masterGain);
+    n.start(t); n.stop(t+0.4);
+
+    // wah-wah slide
+    const o = audioCtx.createOscillator();
+    o.type = 'square';
+    const og = audioCtx.createGain();
+    og.gain.setValueAtTime(0.2, t);
+    og.gain.exponentialRampToValueAtTime(0.0001, t+0.5);
+    o.frequency.setValueAtTime(240, t);
+    o.frequency.exponentialRampToValueAtTime(60, t+0.5);
+    o.connect(og); og.connect(masterGain);
+    o.start(t); o.stop(t+0.5);
+  }
+  function playPoint() {
+    if (!audioCtx || isMuted) return;
+    const t = now();
+    const mkTing = (f0, dt) => {
+      const o = audioCtx.createOscillator();
+      o.type = 'triangle';
+      const g = audioCtx.createGain();
+      g.gain.setValueAtTime(0.0001, t+dt);
+      g.gain.exponentialRampToValueAtTime(0.5, t+dt+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t+dt+0.15);
+      o.frequency.setValueAtTime(f0, t+dt);
+      o.frequency.exponentialRampToValueAtTime(f0*1.4, t+dt+0.06);
+      o.connect(g); g.connect(masterGain);
+      o.start(t+dt); o.stop(t+dt+0.18);
+    };
+    mkTing(880, 0);
+    mkTing(1320, 0.06);
+  }
+  function playStart() {
+    if (!audioCtx || isMuted) return;
+    const t = now();
+    const o = audioCtx.createOscillator();
+    o.type = 'sawtooth';
+    const g = audioCtx.createGain();
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(0.5, t+0.02);
+    g.gain.exponentialRampToValueAtTime(0.0001, t+0.22);
+    o.frequency.setValueAtTime(420, t);
+    o.frequency.exponentialRampToValueAtTime(700, t+0.06);
+    o.frequency.exponentialRampToValueAtTime(400, t+0.22);
+    o.connect(g); g.connect(masterGain);
+    o.start(t); o.stop(t+0.23);
+  }
+  function playFanfare() {
+    if (!audioCtx || isMuted) return;
+    const t = now();
+    const notes = [740, 880, 988, 1176];
+    notes.forEach((f,i) => {
+      const o = audioCtx.createOscillator();
+      o.type = 'square';
+      const g = audioCtx.createGain();
+      const st = t + i*0.08;
+      g.gain.setValueAtTime(0.0001, st);
+      g.gain.exponentialRampToValueAtTime(0.5, st+0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, st+0.18);
+      o.frequency.value = f;
+      o.connect(g); g.connect(masterGain);
+      o.start(st); o.stop(st+0.19);
+    });
+  }
+
+  muteBtn.addEventListener('click', () => {
+    primeAudio();
+    setMuted(!isMuted);
+  }, { passive:true });
+
+  // Game state
+  const state = {
+    mode: 'ready', // 'ready' | 'playing' | 'gameover'
+    time: 0,
+    score: 0,
+    best: highScore,
+    distance: 0,
+    speed: 360,          // px/s base
+    maxSpeed: 980,
+    accel: 28,           // px/s^2
+    spawnTimer: 0,
+    groundH: 0,
+    newHighShown: false
+  };
+
+  const input = {
+    jumpQueued: false,
+    pointerDown: false,
+    lastDown: 0
+  };
+
+  // Player (cartoon ball)
+  const player = {
+    x: 0, y: 0, r: 28,
+    vy: 0,
+    gravity: 2200,
+    jumpV: 900,
+    onGround: true,
+    coyoteTime: 0,
+    coyoteWindow: 0.08,
+    jumpBuffer: 0,
+    bufferWindow: 0.12,
+    mouthMode: 'smile', // smile | o | x
+    faceBlinkT: 0,
+    faceBlinkNext: 0.5 + Math.random()*2.0,
+    squish: 0
+  };
+
+  // Obstacles
+  const obstacles = [];
+  function addObstacle() {
+    const minW = 34, maxW = 84;
+    const minH = 36, maxH = Math.max(60, Math.min(120, state.groundH*0.9));
+    // Variety: rectangle or spike
+    const isSpike = Math.random() < 0.3;
+    const w = isSpike ? 48 : (minW + Math.random()*(maxW-minW));
+    const h = isSpike ? (minH + Math.random()*(maxH-minH)) : (minH + Math.random()*(maxH-minH));
+    const x = W + 40 + Math.random()*40;
+    const y = H - state.groundH - h;
+    const hue = Math.floor(Math.random()*360);
+    const color = `hsl(${hue} 85% 60%)`;
+    const face = Math.random() < 0.6 ? {
+      blinkT: Math.random()*2,
+      blinkNext: 1+Math.random()*3,
+      mouth: Math.random()<0.5 ? 'smile' : 'o',
+      eyeShift: Math.random()*0.3
+    } : null;
+    obstacles.push({ x, y, w, h, color, isSpike, face, bobT: Math.random()*Math.PI*2 });
+  }
+
+  // Background layers (parallax)
+  const clouds = [];
+  const FAR_CLOUDS = 14;
+  function setupClouds() {
+    clouds.length = 0;
+    for (let i=0;i<FAR_CLOUDS;i++){
+      clouds.push({
+        x: Math.random()*W,
+        y: Math.random()*H*0.5,
+        s: 0.6 + Math.random()*1.4, // size scale
+        v: 12 + Math.random()*18, // speed
+        c: `hsla(${180+Math.random()*40} 80% 98% / ${0.5+Math.random()*0.35})`
+      });
+    }
+  }
+  setupClouds();
+
+  const hills = {
+    near: { offset: 0, speed: 40, color: '#72e592' },
+    mid:  { offset: 0, speed: 20, color: '#6fdcff' },
+    far:  { offset: 0, speed: 10, color: '#98b6ff' },
+  };
+
+  function resetGame(full=true) {
+    obstacles.length = 0;
+    state.score = 0;
+    state.distance = 0;
+    state.time = 0;
+    state.speed = 360;
+    state.spawnTimer = 0;
+    state.groundH = Math.max(120, Math.floor(H * 0.22));
+    player.x = Math.max(80, W*0.22);
+    player.y = H - state.groundH - player.r;
+    player.vy = 0;
+    player.onGround = true;
+    player.coyoteTime = 0;
+    player.jumpBuffer = 0;
+    player.mouthMode = 'smile';
+    player.faceBlinkT = 0;
+    player.faceBlinkNext = 0.5 + Math.random()*2;
+    player.squish = 0;
+    hills.near.offset = 0;
+    hills.mid.offset = 0;
+    hills.far.offset = 0;
+    setupClouds();
+    if (full && audioCtx) playStart();
+  }
+
+  function toPlaying() {
+    state.mode = 'playing';
+    overlay.classList.add('hidden');
+    resetGame(false);
+  }
+  function toReady() {
+    state.mode = 'ready';
+    overlay.classList.remove('hidden');
+    const title = overlay.querySelector('h1');
+    title.innerHTML = '🎉 Welcome to Jumping Ball Runner';
+    overlay.querySelector('.footer-note').textContent = 'Tip: Try to time your jumps late — the ball’s boing is strong!';
+    const how = overlay.querySelector('#howBtn');
+    how.onclick = () => {
+      const p = overlay.querySelector('.footer-note');
+      p.textContent = 'Space/Up/Tap to jump. Survive as long as you can. Speed increases over time. Avoid boxes and spikes!';
+    };
+  }
+  function toGameOver() {
+    state.mode = 'gameover';
+    if (audioCtx) playHit();
+    const wasHigh = state.score > state.best;
+    if (wasHigh) {
+      state.best = Math.floor(state.score);
+      localStorage.setItem(HS_KEY, String(state.best));
+      elHigh.textContent = state.best.toString();
+      state.newHighShown = true;
+      if (audioCtx) playFanfare();
+    }
+    // Build overlay content
+    overlay.classList.remove('hidden');
+    const card = overlay.querySelector('.card');
+    const title = overlay.querySelector('h1');
+    title.textContent = wasHigh ? '🌟 New High Score!' : '💥 Ouch! Game Over';
+    const paras = card.querySelectorAll('p');
+    paras[0].innerHTML = `Score: <b>${Math.floor(state.score)}</b> — High: <b>${state.best}</b> ${wasHigh ? '<span class="new-high">🔥</span>' : ''}`;
+    const footer = card.querySelector('.footer-note');
+    footer.textContent = 'Press R or tap Retry to try again!';
+    // Replace CTA
+    const cta = card.querySelector('.cta');
+    cta.innerHTML = '';
+    const retryBtn = document.createElement('button');
+    retryBtn.className = 'btn green';
+    retryBtn.id = 'retryBtn';
+    retryBtn.textContent = 'Retry 🔁';
+    const homeBtn = document.createElement('button');
+    homeBtn.className = 'btn alt';
+    homeBtn.textContent = 'Main Menu';
+    cta.appendChild(retryBtn); cta.appendChild(homeBtn);
+    retryBtn.onclick = () => { primeAudio(); playStart(); overlay.classList.add('hidden'); state.mode='playing'; resetGame(false); };
+    homeBtn.onclick = () => { toReady(); };
+  }
+
+  // Input handlers
+  function queueJump() {
+    input.jumpQueued = true;
+    input.lastDown = performance.now();
+  }
+  window.addEventListener('keydown', (e) => {
+    if (e.repeat) return;
+    if (e.code === 'Space' || e.code === 'ArrowUp' || e.key === ' ') {
+      primeAudio();
+      queueJump();
+      e.preventDefault();
+    } else if (e.code === 'KeyR') {
+      if (state.mode === 'gameover') {
+        primeAudio(); playStart();
+        overlay.classList.add('hidden');
+        state.mode='playing'; resetGame(false);
+      }
+    } else if (e.code === 'KeyM') {
+      primeAudio(); setMuted(!isMuted);
+    }
+  }, { passive:false });
+
+  canvas.addEventListener('pointerdown', (e) => {
+    primeAudio();
+    input.pointerDown = true; queueJump();
+  }, { passive:true });
+  canvas.addEventListener('pointerup', () => {
+    input.pointerDown = false;
+  }, { passive:true });
+
+  playBtn.addEventListener('click', () => { primeAudio(); playStart(); toPlaying(); }, { passive:true });
+  howBtn.addEventListener('click', () => {
+    const p = overlay.querySelector('.footer-note');
+    p.textContent = 'Space/Up/Tap to jump. Survive as long as you can. Speed increases over time. Avoid boxes and spikes!';
+  }, { passive:true });
+
+  // Helpers
+  const clamp = (v, mn, mx) => Math.max(mn, Math.min(mx, v));
+  const rand = (a,b) => a + Math.random()*(b-a);
+
+  // Physics + Game loop
+  let lastT = performance.now();
+  function step() {
+    const nowT = performance.now();
+    let dt = (nowT - lastT) / 1000;
+    // avoid spiral of death and ensure stable updates
+    dt = Math.min(dt, 1/25);
+    lastT = nowT;
+
+    ctx.clearRect(0,0,W,H);
+    drawBG(dt);
+
+    if (state.mode === 'playing') {
+      update(dt);
+      drawObstacles();
+      drawPlayer();
+    } else {
+      // Draw idle scene (parallax, ground, idle player)
+      drawObstacles(); // empty
+      drawPlayerIdle();
+    }
+
+    drawHUD();
+
+    requestAnimationFrame(step);
+  }
+  requestAnimationFrame(step);
+
+  function update(dt) {
+    state.time += dt;
+    // speed ramp
+    state.speed = clamp(state.speed + state.accel * dt, 0, state.maxSpeed);
+    hills.near.offset += state.speed * dt * 0.25;
+    hills.mid.offset  += state.speed * dt * 0.12;
+    hills.far.offset  += state.speed * dt * 0.06;
+
+    // clouds drift slowly to the left
+    for (const c of clouds) {
+      c.x -= (c.v + state.speed*0.02) * dt;
+      if (c.x < -160) {
+        c.x = W + 80;
+        c.y = Math.random() * H * 0.5;
+        c.s = 0.6 + Math.random()*1.4;
+      }
+    }
+
+    // score and distance
+    state.distance += state.speed * dt;
+    state.score = Math.floor(state.distance / 8); // scale to feel nice
+    elScore.textContent = state.score.toString();
+    elSpd.textContent = (state.speed/360).toFixed(1) + 'x';
+
+    // milestone sound
+    if (state.score > 0 && state.score % 100 === 0 && (state.time % 0.25) < dt) {
+      playPoint();
+    }
+
+    // Spawn obstacles
+    const baseInterval = clamp(1.15 - (state.speed - 360)/1000, 0.45, 1.15);
+    state.spawnTimer -= dt;
+    if (state.spawnTimer <= 0) {
+      addObstacle();
+      // sometimes add a second close obstacle for spice
+      if (Math.random() < 0.35) {
+        state.spawnTimer = baseInterval * 0.4;
+      } else {
+        state.spawnTimer = baseInterval;
+      }
+    }
+
+    // Move obstacles
+    for (let i=obstacles.length-1; i>=0; i--) {
+      const o = obstacles[i];
+      o.x -= state.speed * dt;
+      o.bobT += dt * 3;
+      if (o.x + o.w < -40) obstacles.splice(i,1);
+    }
+
+    // Player physics
+    const prevY = player.y;
+    player.coyoteTime = Math.max(0, player.coyoteTime - dt);
+    player.jumpBuffer = Math.max(0, player.jumpBuffer - dt);
+    player.faceBlinkT += dt;
+    if (player.faceBlinkT > player.faceBlinkNext) {
+      player.faceBlinkT = 0;
+      player.faceBlinkNext = 1 + Math.random()*2.2;
+    }
+
+    // queue jump
+    if (input.jumpQueued) {
+      player.jumpBuffer = player.bufferWindow;
+      input.jumpQueued = false;
+    }
+
+    const onGroundBefore = player.onGround;
+    player.vy += player.gravity * dt;
+    player.y += player.vy * dt;
+
+    const groundY = H - state.groundH - player.r;
+    if (player.y >= groundY) {
+      player.y = groundY;
+      player.vy = 0;
+      player.onGround = true;
+      player.coyoteTime = player.coyoteWindow;
+    } else {
+      player.onGround = false;
+    }
+
+    // execute jump if possible
+    if ((player.onGround || player.coyoteTime > 0) && player.jumpBuffer > 0) {
+      player.vy = -player.jumpV;
+      player.onGround = false;
+      player.coyoteTime = 0;
+      player.jumpBuffer = 0;
+      player.mouthMode = 'o';
+      if (audioCtx) playJump();
+    }
+
+    // mouth relax back to smile
+    if (!player.onGround) {
+      player.squish = clamp(player.vy/ -player.jumpV, 0, 1) * 0.2;
+    } else {
+      // landing squish
+      const landed = !onGroundBefore && player.onGround;
+      if (landed) {
+        player.squish = 0.35;
+      }
+      player.squish = Math.max(0, player.squish - dt*1.8);
+      if (player.mouthMode === 'o') {
+        player.mouthMode = 'smile';
+      }
+    }
+
+    // Collision detection
+    for (const o of obstacles) {
+      if (checkCollisionCircleRect(player.x, player.y, player.r*0.96, o.x, o.y, o.w, o.h)) {
+        // Game over
+        player.mouthMode = 'x';
+        toGameOver();
+        break;
+      }
+    }
+  }
+
+  function checkCollisionCircleRect(cx, cy, cr, rx, ry, rw, rh) {
+    const nearestX = clamp(cx, rx, rx+rw);
+    const nearestY = clamp(cy, ry, ry+rh);
+    const dx = cx - nearestX;
+    const dy = cy - nearestY;
+    return (dx*dx + dy*dy) <= (cr*cr);
+  }
+
+  // Drawing
+  function drawBG(dt) {
+    // sky gradient
+    const g = ctx.createLinearGradient(0, 0, 0, H);
+    g.addColorStop(0, '#7cc0ff');
+    g.addColorStop(1, '#ffda79');
+    ctx.fillStyle = g;
+    ctx.fillRect(0, 0, W, H);
+
+    // Sun
+    const sunX = W*0.85, sunY = H*0.18, sunR = Math.min(W,H)*0.08;
+    const sg = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, sunR*1.6);
+    sg.addColorStop(0,'#fffad1');
+    sg.addColorStop(1,'#fff0');
+    ctx.fillStyle = sg;
+    ctx.beginPath(); ctx.arc(sunX, sunY, sunR*1.6, 0, Math.PI*2); ctx.fill();
+
+    // clouds (parallax far)
+    for (const c of clouds) {
+      drawCloud(c.x, c.y, 28*c.s, c.c);
+    }
+
+    // Hills parallax
+    drawHillsLayer(hills.far, 120, 0.9);
+    drawHillsLayer(hills.mid,  170, 0.8);
+    drawHillsLayer(hills.near, 220, 0.6);
+
+    // Ground
+    drawGround();
+  }
+
+  function drawCloud(x,y,s,fill) {
+    ctx.fillStyle = fill;
+    ctx.beginPath();
+    const p = [
+      [x, y], [x+s*0.9, y-0.3*s], [x+s*1.9, y-0.1*s], [x+s*2.6, y]
+    ];
+    ctx.arc(p[0][0], p[0][1], s*0.9, Math.PI*0.5, Math.PI*1.5);
+    ctx.arc(p[1][0], p[1][1], s*0.7, Math.PI*1.0, Math.PI*2.0);
+    ctx.arc(p[2][0], p[2][1], s*1.0, Math.PI*1.0, Math.PI*2.0);
+    ctx.arc(p[3][0], p[3][1], s*0.8, Math.PI*1.2, Math.PI*1.9);
+    ctx.closePath();
+    ctx.fill();
+  }
+
+  function drawHillsLayer(layer, baseH, darkness=0.8) {
+    const yBase = H - state.groundH - baseH;
+    const amplitude = 40;
+    const waveLen = 320;
+    ctx.fillStyle = layer.color;
+    ctx.beginPath();
+    ctx.moveTo(-1000, H);
+    ctx.lineTo(-1000, yBase);
+    const offset = - (layer.offset % waveLen);
+    for (let x=-1000; x<=W+1000; x+=16) {
+      const sx = x + offset;
+      const y = yBase + Math.sin((sx)/waveLen * Math.PI*2) * amplitude;
+      ctx.lineTo(x, y);
+    }
+    ctx.lineTo(W+1000, H);
+    ctx.closePath();
+    ctx.globalAlpha = darkness;
+    ctx.fill();
+    ctx.globalAlpha = 1;
+  }
+
+  function drawGround() {
+    const y = H - state.groundH;
+    // main ground
+    ctx.fillStyle = '#1f1f2b';
+    ctx.fillRect(0, y, W, state.groundH);
+
+    // stripes (foreground parallax)
+    const stripeH = 8;
+    const spacing = 36;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(0, y, W, state.groundH);
+    ctx.clip();
+    for (let i=0;i<50;i++){
+      const x = (W - ((i*spacing + (state.speed*0.7 * (state.time||0))) % (W+spacing)));
+      ctx.fillStyle = i%2===0 ? '#34ffd4' : '#ff7ab6';
+      ctx.globalAlpha = 0.15 + (i%3)*0.04;
+      ctx.fillRect(x, y+8+i%5, 16, stripeH);
+    }
+    ctx.restore();
+    ctx.globalAlpha = 1;
+
+    // top border
+    ctx.fillStyle = '#ffffff22';
+    ctx.fillRect(0, y-2, W, 2);
+  }
+
+  function drawObstacles() {
+    for (const o of obstacles) {
+      if (o.isSpike) {
+        const bob = Math.sin(o.bobT)*2;
+        drawSpike(o.x, o.y + bob, o.w, o.h, o.color, o.face);
+      } else {
+        const bob = Math.sin(o.bobT)*1.5;
+        drawBox(o.x, o.y + bob, o.w, o.h, o.color, o.face);
+      }
+    }
+  }
+
+  function drawBox(x,y,w,h,color,face) {
+    // body
+    const r = 10;
+    ctx.fillStyle = color;
+    roundRect(ctx, x, y, w, h, r, true);
+    // outline
+    ctx.strokeStyle = '#00000033';
+    ctx.lineWidth = 3;
+    roundRect(ctx, x, y, w, h, r, false);
+
+    // cartoon face
+    if (face) {
+      const cx = x + w*0.5;
+      const cy = y + h*0.4;
+      const eyeGap = w*0.18;
+      const eyeR = Math.max(4, Math.min(8, w*0.08));
+      const pupilR = eyeR*0.5;
+      // eyes
+      const blink = (Math.sin((state.time + face.blinkT)*6) > 0.95) ? 0.1 : 1;
+      drawEye(cx - eyeGap, cy, eyeR, pupilR, blink, face.eyeShift);
+      drawEye(cx + eyeGap, cy, eyeR, pupilR, blink, face.eyeShift);
+      // mouth
+      ctx.strokeStyle = '#1a1a1a';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      if (face.mouth === 'o') {
+        ctx.arc(cx, cy + eyeR + 6, 6, 0, Math.PI*2);
+      } else {
+        ctx.moveTo(cx-8, cy + eyeR + 8);
+        ctx.quadraticCurveTo(cx, cy + eyeR + 12, cx+8, cy + eyeR + 8);
+      }
+      ctx.stroke();
+    }
+  }
+
+  function drawSpike(x,y,w,h,color,face) {
+    // body (triangle)
+    ctx.beginPath();
+    ctx.moveTo(x, y+h);
+    ctx.lineTo(x + w*0.5, y);
+    ctx.lineTo(x + w, y+h);
+    ctx.closePath();
+    ctx.fillStyle = color;
+    ctx.fill();
+    ctx.strokeStyle = '#00000033';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    // face on front
+    const cx = x + w*0.5;
+    const cy = y + h*0.6;
+    const eyeR = Math.max(4, Math.min(7, w*0.08));
+    const pupilR = eyeR*0.5;
+    const eyeGap = w*0.15;
+    drawEye(cx - eyeGap, cy, eyeR, pupilR, 1, 0.15);
+    drawEye(cx + eyeGap, cy, eyeR, pupilR, 1, -0.15);
+    ctx.strokeStyle = '#1a1a1a';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.moveTo(cx-6, cy + eyeR + 6);
+    ctx.lineTo(cx+6, cy + eyeR + 6);
+    ctx.stroke();
+  }
+
+  function drawEye(x, y, r, pr, blink=1, shift=0) {
+    // white
+    ctx.fillStyle = '#fff';
+    ctx.beginPath();
+    ctx.ellipse(x, y, r, r*blink, 0, 0, Math.PI*2);
+    ctx.fill();
+    // pupil
+    const px = x + r*0.3*shift;
+    const py = y + r*0.15*(1-blink);
+    ctx.fillStyle = '#222';
+    ctx.beginPath();
+    ctx.arc(px, py, pr, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  function roundRect(c, x, y, w, h, r, fill=true) {
+    c.beginPath();
+    c.moveTo(x+r, y);
+    c.arcTo(x+w, y, x+w, y+h, r);
+    c.arcTo(x+w, y+h, x, y+h, r);
+    c.arcTo(x, y+h, x, y, r);
+    c.arcTo(x, y, x+w, y, r);
+    c.closePath();
+    if (fill) c.fill(); else c.stroke();
+  }
+
+  function drawPlayer() {
+    const baseX = player.x;
+    const baseY = player.y;
+    const squishX = 1 + player.squish*0.8;
+    const squishY = 1 - player.squish*0.9;
+    ctx.save();
+    ctx.translate(baseX, baseY);
+    ctx.scale(squishX, squishY);
+
+    // body with gradient
+    const r = player.r;
+    const g = ctx.createRadialGradient(-r*0.4, -r*0.4, r*0.2, 0, 0, r*1.2);
+    g.addColorStop(0, '#fff8');
+    g.addColorStop(1, '#ff5fbf');
+    ctx.fillStyle = g;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+    ctx.fill();
+
+    // outline
+    ctx.strokeStyle = '#00000033';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(0, 0, r, 0, Math.PI*2);
+    ctx.stroke();
+
+    // eyes
+    const blink = player.faceBlinkT < 0.05 ? 0.1 : 1;
+    const eyeR = 6;
+    const pupilR = 3;
+    const danger = nearestObstacleAhead();
+    const lookAhead = danger && danger.dist < 240 ? 0.4 : 0.1;
+    drawEye(-10 + lookAhead*4, -6, eyeR, pupilR, blink, lookAhead);
+    drawEye( 10 + lookAhead*4, -6, eyeR, pupilR, blink, lookAhead);
+
+    // mouth
+    ctx.strokeStyle = '#221';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    if (player.mouthMode === 'o') {
+      ctx.arc(0, 6, 5, 0, Math.PI*2);
+    } else if (player.mouthMode === 'x') {
+      ctx.moveTo(-6, 8); ctx.lineTo(6, 14);
+      ctx.moveTo(6, 8); ctx.lineTo(-6, 14);
+    } else {
+      ctx.moveTo(-8, 10); ctx.quadraticCurveTo(0, 14, 8, 10);
+    }
+    ctx.stroke();
+
+    // silly hat
+    ctx.fillStyle = '#34ffd4';
+    ctx.beginPath();
+    ctx.ellipse(0, -r-4, 18, 6, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.restore();
+  }
+
+  function drawPlayerIdle() {
+    // subtle bounce idle
+    const t = (performance.now()/1000);
+    const idleY = Math.sin(t*2)*2;
+    const oldY = player.y;
+    player.y = H - Math.max(120, Math.floor(H*0.22)) - player.r + idleY;
+    drawPlayer();
+    player.y = oldY;
+  }
+
+  function nearestObstacleAhead() {
+    let best = null;
+    for (const o of obstacles) {
+      const dist = o.x - player.x;
+      if (dist >= -20) {
+        if (!best || dist < best.dist) best = {o, dist};
+      }
+    }
+    return best;
+  }
+
+  function drawHUD() {
+    // update UI (Score/High handled in update)
+    // nothing else to draw here; DOM chips already visible
+  }
+
+  // Start in ready mode
+  toReady();
+
+})();
+</script>
+</body>
+</html>
